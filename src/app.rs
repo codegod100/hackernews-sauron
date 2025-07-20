@@ -1,12 +1,12 @@
-use common::types::{
+use crate::types::{
     Comment, StoryItem, StoryPageData, StorySorting, UserData,
 };
 pub use content::Content;
 use sauron::prelude::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "wasm")]
-use common::api;
-use common::api::ServerError;
+use crate::api;
+use crate::api::ServerError;
 
 mod content;
 
@@ -56,20 +56,32 @@ impl Application for App {
 
     #[cfg(feature = "wasm")]
     fn init(&mut self) -> Cmd<Msg> {
+        // Handle initial load by checking current hash/pathname
+        let location = sauron::window().location();
+        let hash = location.hash().unwrap_or_default();
+        let pathname = location.pathname().unwrap_or_default();
+        let url = if hash.is_empty() { pathname } else { hash };
+        
         Cmd::batch([
+            // Use popstate for now, we'll handle hash changes through URL monitoring
             Window::on_popstate(|_e| {
-                log::trace!("pop_state is triggered in sauron add event listener");
-                let url = sauron::window()
-                    .location()
-                    .pathname()
-                    .expect("must have get a pathname");
+                log::trace!("popstate is triggered in sauron add event listener");
+                let location = sauron::window().location();
+                let hash = location.hash().unwrap_or_default();
+                let pathname = location.pathname().unwrap_or_default();
+                let url = if hash.is_empty() { pathname } else { hash };
                 Msg::UrlChanged(url)
             }),
-            match self.content{
-                FetchStatus::Idle => {
-                    self.fetch_stories()
+            // Handle initial routing
+            if !url.is_empty() && url != "/" {
+                Cmd::new(async move { Msg::UrlChanged(url) })
+            } else {
+                match self.content{
+                    FetchStatus::Idle => {
+                        self.fetch_stories()
+                    }
+                    _ => Cmd::none(),
                 }
-                _ => Cmd::none(),
             },
         ])
     }
@@ -164,19 +176,27 @@ impl Application for App {
             Msg::UrlChanged(url) => {
                 self.is_loading = true;
                 log::trace!("url changed to: {}", url);
-                let cmd = if let Some(sorting) = StorySorting::from_url(&url) {
+                
+                // Extract hash from URL or use the full URL for backwards compatibility
+                let hash = if let Some(hash_part) = url.split('#').nth(1) {
+                    format!("#{}", hash_part)
+                } else {
+                    url.clone()
+                };
+                
+                let cmd = if let Some(sorting) = StorySorting::from_url(&hash) {
                     self.is_loading = true;
                     self.fetch_stories_with_sorting(sorting)
-                } else if let Some(story_id) = StoryItem::id_from_url(&url) {
+                } else if let Some(story_id) = StoryItem::id_from_url(&hash) {
                     self.fetch_story_page(story_id)
-                } else if let Some(comment_id) = Comment::id_from_url(&url) {
+                } else if let Some(comment_id) = Comment::id_from_url(&hash) {
                     self.fetch_comment_permalink(comment_id)
-                } else if let Some(username) = UserData::id_from_url(&url) {
+                } else if let Some(username) = UserData::id_from_url(&hash) {
                     self.fetch_user_page(username)
-                } else if "/" == url.trim() {
+                } else if "/" == url.trim() || url.trim().is_empty() || hash == "#" {
                     self.fetch_stories()
                 } else {
-                    log::trace!("No appropriate route found for url: {}", url);
+                    log::trace!("No appropriate route found for url: {} (hash: {})", url, hash);
                     Cmd::none()
                 };
 
@@ -355,11 +375,18 @@ impl App{
     }
 
     fn push_state_url(url: &str) {
-        let history = sauron::window().history().expect("must have history");
-        log::trace!("pushing to state: {}", url);
-        history
-            .push_state_with_url(&JsValue::from_str(url), "", Some(url))
-            .expect("must push state");
+        let window = sauron::window();
+        let location = window.location();
+        log::trace!("setting hash to: {}", url);
+        
+        // For hash routing, set the hash directly
+        if url.starts_with('#') {
+            location.set_hash(url).expect("must set hash");
+        } else if url == "/" {
+            location.set_hash("").expect("must set hash");
+        } else {
+            location.set_hash(&format!("#{}", url.trim_start_matches('/'))).expect("must set hash");
+        }
     }
 }
 

@@ -1,39 +1,43 @@
-# Hackernews sauron
+# Hackernews Sauron
 
-A hacker news clone in ~1k lines of rust.
-This is using [sauron](https://github.com/ivanceras/sauron) web-framework.
+A pure client-side Hacker News clone built with [Sauron](https://github.com/ivanceras/sauron) (Rust WASM framework).
 
+## Features
+- ✅ **100% Client-side** - No backend required, pure static deployment
+- ✅ **Hash-based routing** - URLs like `#top`, `#item/123`, `#user/pg`
+- ✅ **Direct HN API** - Calls HackerNews Firebase API directly (CORS-enabled)
+- ✅ **HTML content parsing** - Properly renders HTML entities and tags in comments
+- ✅ **Modern Rust WASM** - Built with the latest Sauron framework
 
-## Feature
-- [X] Isomorphic
-    - [X] Completely identical server-side rendered and client-side rendered
-    - [X] No weird font jumping.
-- [X] Resilient
-    - [X] Can work without javascript enabled.
-    - [X] Can work without the page server*.
-        - You can kill the server after the initial serve.
-    - *Note: This will not work if both points of failure are encountered at the same time.
+## Quick Start
 
-## Quickstart
-
-Prerequisite:
-
+### Prerequisites
 ```sh
 cargo install wasm-pack
 ```
 
-Compile and run
+### Build and Run
 ```sh
-git clone --depth=1 https://github.com/ivanceras/hackernews-sauron
-
+git clone https://github.com/ivanceras/hackernews-sauron
 cd hackernews-sauron
 
-wasm-pack build client --release --target web
+# Build the WASM application
+wasm-pack build . --release --target web
 
-cargo run --release --bin server
+# Serve static files (any HTTP server works)
+python3 -m http.server 8080
+# or: npx serve .
+# or: caddy file-server
 ```
 
-Navigate to http://localhost:3030
+Navigate to http://localhost:8080
+
+### Deploy Anywhere
+Since this is now a pure static app, you can deploy to:
+- **GitHub Pages** - Just push to gh-pages branch
+- **Netlify** - Drag and drop the root folder
+- **Vercel** - Connect your repo  
+- **Any CDN** - Upload files to your preferred hosting
 
 ![Screenshot](https://raw.githubusercontent.com/ivanceras/hackernews-sauron/master/client/assets/screenshot-hn-clone.png)
 

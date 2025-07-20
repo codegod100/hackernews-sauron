@@ -1,5 +1,11 @@
 #![deny(warnings)]
 #![deny(unused_extern_crates)]
+
+// Common modules (previously from common crate)
+pub mod api;
+pub mod types;
+
+// App modules (previously from client crate)
 pub use app::{App, Msg};
 use sauron::prelude::*;
 pub use sauron;
@@ -7,10 +13,9 @@ pub use sauron;
 mod app;
 pub mod util;
 
-/// The serialized_state is supplied by the generated page from the webserver.
-/// The generated page in index function has a main function which is supplied by a json text
-/// serialized state. This json text is deserialized and used here as our `App` value which
-/// will then be injected into the view
+/// The serialized_state is optionally supplied for server-side rendering hydration.
+/// For pure client-side applications, an empty string can be passed to start with App::default().
+/// The app will then initialize with default state and begin client-side routing.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub async fn main(serialized_state: String) {
     #[cfg(feature = "wasm-bindgen")]

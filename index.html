@@ -9,7 +9,7 @@
        <link rel="shortcut icon" href="favicon.svg" type="image/x-icon"/>
        <title>Hacker News</title>
        <script type="module">
-          import init, { main } from './pkg/client.js';
+          import init, { main } from './pkg/hackernews_sauron.js';
           async function start() {
             await init().catch(console.err);
             await main(``).catch(console.err);

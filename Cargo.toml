@@ -1,20 +1,59 @@
-[workspace]
+[package]
+name = "hackernews-sauron"
+version = "0.1.0"
+authors = ["Jovansonlee Cesar<ivanceras@gmail.com>"]
+edition = "2018"
+license = "MIT"
+description = "A Hacker News clone built with Sauron (Rust WASM framework)"
 
-members = [
-    "server",
-    "client"
-]
+[lib]
+crate-type = ["cdylib", "rlib"]
 
+[dependencies]
+# Sauron framework
+sauron = "0.61"
 
-[patch.crates-io]
-#mt-dom = { git = "https://github.com/ivanceras/mt-dom.git", branch = "master" }
-#sauron = { git = "https://github.com/ivanceras/sauron.git", branch = "develop" }
-#sauron = { path = "../sauron" }
+# WASM bindings (optional for WASM builds)
+wasm-bindgen = { version = "0.2.29", optional = true}
+wasm-bindgen-futures = { version = "0.4.1", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true}
+console_log = {version ="0.2", features = ["color"], optional = true}
+
+# HTTP client for API calls
+reqwest = { version = "0.11.4", features = ["json"] }
+futures = "0.3.7"
+async-recursion = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["serde_derive"]}
+serde_json = "1.0"
+
+# Date/time handling
+chrono = { version = "0.4.19", features = ["serde", "wasmbind"] } 
+
+# HTML processing
+html-escape = "0.2"
+ammonia = "3.3"
+
+# Utilities
+derive_more = "0.99.16"
+log = "0.4"
+thiserror = "1"
+
+# Caching (optional)
+lru = { version = "0.6.1", optional = true }
+lazy_static = { version = "1.4.0", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.9", features = ["full"] }
+
+[features]
+default = ["wasm", "caching"]
+wasm = ["wasm-bindgen", "wasm-bindgen-futures", "console_error_panic_hook", "console_log"]
+caching = ["lazy_static", "lru"]
 
 [profile.release]
 # optimize for binary size
-#opt-level = "s"
-# optimize for binary size, but also turn off loop vectorization.
 opt-level = "z"
 lto = true
 panic = "abort"

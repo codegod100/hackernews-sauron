@@ -1,5 +1,5 @@
 use crate::app;
-use common::types::{Comment, StoryItem, StoryPageData, UserData};
+use crate::types::{Comment, StoryItem, StoryPageData, UserData};
 use sauron::prelude::*;
 use serde::{Deserialize, Serialize};
 //use sauron::safe_html;
@@ -35,7 +35,7 @@ impl Content {
                 node! {
                     <div class="user-details">
                         <h4>{ text!("{}:",user_data.id) }</h4>
-                        <p>{ raw_html(&user_data.about) }</p>
+                        <div>{ for node in crate::util::parse_html_to_nodes(&user_data.about) { node } }</div>
                         <span>{ text!("{} karma", user_data.karma) }</span>
                         <div class="submissions">
                              {self.view_story_preview_list(&user_data.stories)}
@@ -156,7 +156,7 @@ impl Content {
                         }>{text!(" {} ago", crate::util::time_ago(comment.time))}
                     </a>
                 </div>
-                <div class="comment">{ raw_html(&comment.text) }</div>
+                <div class="comment">{ for node in crate::util::parse_html_to_nodes(&comment.text) { node } }</div>
                 <ul class="sub-comments">
                 {
                     for sub in &comment.sub_comments{

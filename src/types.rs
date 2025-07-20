@@ -30,9 +30,10 @@ impl StorySorting {
             StorySorting::Job,
         ]
     }
-    /// match url to StorySorting
+    /// match url to StorySorting (supports both hash and path routing)
     pub fn from_url(url: &str) -> Option<Self> {
-        Self::all().into_iter().find(|s| url == s.to_url())
+        let hash_url = url.strip_prefix("#").unwrap_or(url);
+        Self::all().into_iter().find(|s| hash_url == s.to_str() || url == s.to_url())
     }
     /// return the str for assembling paths in warp
     pub fn to_str(&self) -> &str {
@@ -47,7 +48,7 @@ impl StorySorting {
     }
 
     pub fn to_url(&self) -> String {
-        format!("/{}", self.to_str())
+        format!("#{}", self.to_str())
     }
 }
 
@@ -114,14 +115,21 @@ pub struct Comment {
 }
 
 impl Comment {
-    /// attempt to extract story id from url
+    /// attempt to extract comment id from url (supports both hash and path routing)
     pub fn id_from_url(url: &str) -> Option<i64> {
-        if url.starts_with("/comment") {
-            let splinters = url.split("/").collect::<Vec<_>>();
-            if splinters.len() >= 3 {
-                assert_eq!("", splinters[0]);
-                assert_eq!("comment", splinters[1]);
-                splinters[2].parse::<i64>().ok()
+        let target_url = url.strip_prefix("#").unwrap_or(url);
+        if target_url.starts_with("comment/") || url.starts_with("/comment") {
+            let splinters = if target_url.starts_with("comment/") {
+                target_url.split("/").collect::<Vec<_>>()
+            } else {
+                url.split("/").collect::<Vec<_>>()
+            };
+            if splinters.len() >= 2 {
+                if target_url.starts_with("comment/") {
+                    splinters[1].parse::<i64>().ok()
+                } else {
+                    splinters[2].parse::<i64>().ok()
+                }
             } else {
                 None
             }
@@ -131,7 +139,7 @@ impl Comment {
     }
 
     pub fn to_url(comment_id: i64) -> String {
-        format!("/comment/{}", comment_id)
+        format!("#comment/{}", comment_id)
     }
 }
 
@@ -155,14 +163,21 @@ pub struct StoryItem {
 }
 
 impl StoryItem {
-    /// attempt to extract story id from url
+    /// attempt to extract story id from url (supports both hash and path routing)
     pub fn id_from_url(url: &str) -> Option<i64> {
-        if url.starts_with("/item") {
-            let splinters = url.split("/").collect::<Vec<_>>();
-            if splinters.len() >= 3 {
-                assert_eq!("", splinters[0]);
-                assert_eq!("item", splinters[1]);
-                splinters[2].parse::<i64>().ok()
+        let target_url = url.strip_prefix("#").unwrap_or(url);
+        if target_url.starts_with("item/") || url.starts_with("/item") {
+            let splinters = if target_url.starts_with("item/") {
+                target_url.split("/").collect::<Vec<_>>()
+            } else {
+                url.split("/").collect::<Vec<_>>()
+            };
+            if splinters.len() >= 2 {
+                if target_url.starts_with("item/") {
+                    splinters[1].parse::<i64>().ok()
+                } else {
+                    splinters[2].parse::<i64>().ok()
+                }
             } else {
                 None
             }
@@ -172,7 +187,7 @@ impl StoryItem {
     }
 
     pub fn to_url(story_id: i64) -> String {
-        format!("/item/{}", story_id)
+        format!("#item/{}", story_id)
     }
 }
 
@@ -189,14 +204,21 @@ pub struct UserData {
 }
 
 impl UserData {
-    /// attempt to extract story id from url
+    /// attempt to extract user id from url (supports both hash and path routing)
     pub fn id_from_url(url: &str) -> Option<String> {
-        if url.starts_with("/user") {
-            let splinters = url.split("/").collect::<Vec<_>>();
-            if splinters.len() >= 3 {
-                assert_eq!("", splinters[0]);
-                assert_eq!("user", splinters[1]);
-                Some(splinters[2].to_string())
+        let target_url = url.strip_prefix("#").unwrap_or(url);
+        if target_url.starts_with("user/") || url.starts_with("/user") {
+            let splinters = if target_url.starts_with("user/") {
+                target_url.split("/").collect::<Vec<_>>()
+            } else {
+                url.split("/").collect::<Vec<_>>()
+            };
+            if splinters.len() >= 2 {
+                if target_url.starts_with("user/") {
+                    Some(splinters[1].to_string())
+                } else {
+                    Some(splinters[2].to_string())
+                }
             } else {
                 None
             }
@@ -206,6 +228,6 @@ impl UserData {
     }
 
     pub fn to_url(username: &str) -> String {
-        format!("/user/{}", username)
+        format!("#user/{}", username)
     }
 }
