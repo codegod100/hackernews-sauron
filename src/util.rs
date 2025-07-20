@@ -2,9 +2,26 @@ use chrono::{DateTime, Utc};
 use sauron::prelude::*;
 use sauron::vdom::element;
 
+/// Decode HTML entities in text content
+fn decode_entities(text: &str) -> String {
+    text.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#x27;", "'")
+        .replace("&#x2F;", "/")
+        .replace("&#x3D;", "=")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+}
+
 /// Sanitize HTML and convert to Sauron virtual DOM nodes
 pub fn parse_html_to_nodes<MSG>(text: &str) -> Vec<Node<MSG>> {
-    let sanitized = ammonia::clean(text);
+    // Configure ammonia to allow code-related tags
+    let sanitized = ammonia::Builder::default()
+        .add_tags(&["code", "pre", "tt"])  // Add code formatting tags
+        .clean(text)
+        .to_string();
     
     // Simple HTML parser for common HN tags
     // This is a basic implementation - for full HTML parsing you'd want html5ever
@@ -23,7 +40,7 @@ fn parse_simple_html<MSG>(html: &str) -> Vec<Node<MSG>> {
             if tag_start > current_pos {
                 let text_content = &html[current_pos..tag_start];
                 if !text_content.trim().is_empty() {
-                    nodes.push(text(text_content));
+                    nodes.push(text(decode_entities(text_content)));
                 }
             }
             
@@ -62,20 +79,72 @@ fn parse_simple_html<MSG>(html: &str) -> Vec<Node<MSG>> {
                 } else if tag_content.starts_with("<br") {
                     nodes.push(element("br", [], []));
                     current_pos = tag_end;
+                } else if tag_content.starts_with("<code>") {
+                    if let Some(close_pos) = html[tag_end..].find("</code>") {
+                        let code_content = &html[tag_end..tag_end + close_pos];
+                        // Don't parse code content as HTML - treat as literal text
+                        nodes.push(element("code", [], [text(decode_entities(code_content))]));
+                        current_pos = tag_end + close_pos + 7; // Skip "</code>"
+                    } else {
+                        current_pos = tag_end;
+                    }
+                } else if tag_content.starts_with("<pre>") {
+                    // For <pre>, we need to find the matching </pre> while ignoring any tags inside
+                    let mut pre_end = tag_end;
+                    let mut pre_depth = 1;
+                    
+                    while pre_depth > 0 && pre_end < html.len() {
+                        if let Some(next_tag) = html[pre_end..].find('<') {
+                            pre_end += next_tag;
+                            if html[pre_end..].starts_with("</pre>") {
+                                pre_depth -= 1;
+                                if pre_depth == 0 {
+                                    let pre_content = &html[tag_end..pre_end];
+                                    // Parse the content inside <pre> as HTML to handle nested <code> tags
+                                    nodes.push(element("pre", [], parse_simple_html(pre_content)));
+                                    current_pos = pre_end + 6; // Skip "</pre>"
+                                    break;
+                                }
+                            } else if html[pre_end..].starts_with("<pre>") {
+                                pre_depth += 1;
+                            }
+                            pre_end += 1;
+                        } else {
+                            // No more tags found, parse rest as content with potential HTML
+                            let pre_content = &html[tag_end..];
+                            nodes.push(element("pre", [], parse_simple_html(pre_content)));
+                            current_pos = html.len();
+                            break;
+                        }
+                    }
+                    
+                    if pre_depth > 0 {
+                        // Unclosed pre tag, skip it
+                        current_pos = tag_end;
+                    }
+                } else if tag_content.starts_with("<tt>") {
+                    if let Some(close_pos) = html[tag_end..].find("</tt>") {
+                        let tt_content = &html[tag_end..tag_end + close_pos];
+                        // Don't parse tt content as HTML - treat as literal text
+                        nodes.push(element("tt", [], [text(decode_entities(tt_content))]));
+                        current_pos = tag_end + close_pos + 5; // Skip "</tt>"
+                    } else {
+                        current_pos = tag_end;
+                    }
                 } else {
                     // Skip unknown tags
                     current_pos = tag_end;
                 }
             } else {
                 // Malformed tag, treat as text
-                nodes.push(text(&html[current_pos..]));
+                nodes.push(text(decode_entities(&html[current_pos..])));
                 break;
             }
         } else {
             // No more tags, add remaining text
             let remaining = &html[current_pos..];
             if !remaining.trim().is_empty() {
-                nodes.push(text(remaining));
+                nodes.push(text(decode_entities(remaining)));
             }
             break;
         }
