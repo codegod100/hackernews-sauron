@@ -17,9 +17,10 @@ fn decode_entities(text: &str) -> String {
 
 /// Sanitize HTML and convert to Sauron virtual DOM nodes
 pub fn parse_html_to_nodes<MSG>(text: &str) -> Vec<Node<MSG>> {
-    // Configure ammonia to allow code-related tags
+    // Configure ammonia to allow code-related tags and links
     let sanitized = ammonia::Builder::default()
-        .add_tags(&["code", "pre", "tt"])  // Add code formatting tags
+        .add_tags(&["code", "pre", "tt", "a"])  // Add code formatting tags and links
+        .add_tag_attributes("a", &["href"])     // Allow href attribute on links
         .clean(text)
         .to_string();
     
@@ -128,6 +129,42 @@ fn parse_simple_html<MSG>(html: &str) -> Vec<Node<MSG>> {
                         // Don't parse tt content as HTML - treat as literal text
                         nodes.push(element("tt", [], [text(decode_entities(tt_content))]));
                         current_pos = tag_end + close_pos + 5; // Skip "</tt>"
+                    } else {
+                        current_pos = tag_end;
+                    }
+                } else if tag_content.starts_with("<a ") || tag_content.starts_with("<a>") {
+                    if let Some(close_pos) = html[tag_end..].find("</a>") {
+                        let link_content = &html[tag_end..tag_end + close_pos];
+                        
+                        // Extract href attribute if present
+                        let href = if tag_content.contains("href=") {
+                            // Simple href extraction - find href="..." or href='...'
+                            if let Some(href_start) = tag_content.find("href=\"") {
+                                let href_content_start = href_start + 6; // Skip 'href="'
+                                if let Some(href_end) = tag_content[href_content_start..].find('"') {
+                                    Some(tag_content[href_content_start..href_content_start + href_end].to_string())
+                                } else { None }
+                            } else if let Some(href_start) = tag_content.find("href='") {
+                                let href_content_start = href_start + 6; // Skip "href='"
+                                if let Some(href_end) = tag_content[href_content_start..].find('\'') {
+                                    Some(tag_content[href_content_start..href_content_start + href_end].to_string())
+                                } else { None }
+                            } else { None }
+                        } else { None };
+                        
+                        // Create link element with href attribute
+                        if let Some(href_value) = href {
+                            use sauron::prelude::*;
+                            nodes.push(element("a", [
+                                attr("href", href_value),
+                                attr("target", "_blank"),
+                                attr("rel", "noopener noreferrer")
+                            ], parse_simple_html(link_content)));
+                        } else {
+                            // No href, just render as span
+                            nodes.push(element("span", [], parse_simple_html(link_content)));
+                        }
+                        current_pos = tag_end + close_pos + 4; // Skip "</a>"
                     } else {
                         current_pos = tag_end;
                     }
