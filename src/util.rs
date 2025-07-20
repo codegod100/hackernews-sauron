@@ -15,14 +15,74 @@ fn decode_entities(text: &str) -> String {
         .replace("&nbsp;", " ")
 }
 
+/// Convert plain text URLs to clickable links
+fn linkify_text(text: &str) -> String {
+    let mut result = text.to_string();
+    
+    // Process both https:// and http:// URLs
+    for protocol in &["https://", "http://"] {
+        let mut search_pos = 0;
+        
+        while let Some(start) = result[search_pos..].find(protocol) {
+            let actual_start = search_pos + start;
+            
+            // Skip if this URL is already inside an <a> tag
+            let before_url = &result[..actual_start];
+            if before_url.rfind("<a ").map_or(false, |a_pos| {
+                before_url[a_pos..].find("</a>").is_none()
+            }) {
+                search_pos = actual_start + protocol.len();
+                continue;
+            }
+            
+            let url_start = actual_start;
+            let mut url_end = url_start + protocol.len();
+            
+            // Find the end of the URL
+            while url_end < result.len() {
+                let ch = result.chars().nth(url_end).unwrap();
+                if ch.is_whitespace() || ch == '<' || ch == '>' || ch == ')' || ch == ']' || ch == '(' {
+                    break;
+                }
+                url_end += 1;
+            }
+            
+            // Only process if we have a valid URL (at least domain)
+            if url_end > url_start + protocol.len() + 1 {
+                let url = &result[url_start..url_end];
+                let link_html = format!("<a href=\"{}\">{}</a>", url, url);
+                
+                result.replace_range(url_start..url_end, &link_html);
+                search_pos = url_start + link_html.len();
+            } else {
+                search_pos = actual_start + protocol.len();
+            }
+        }
+    }
+    
+    result
+}
+
 /// Sanitize HTML and convert to Sauron virtual DOM nodes
 pub fn parse_html_to_nodes<MSG>(text: &str) -> Vec<Node<MSG>> {
+    log::trace!("Original text: {}", text);
+    
+    // First decode HTML entities so we can find URLs like https:&#x2F;&#x2F;example.com
+    let decoded = decode_entities(text);
+    log::trace!("Decoded text: {}", decoded);
+    
+    // Then convert plain text URLs to HTML links
+    let linkified = linkify_text(&decoded);
+    log::trace!("Linkified text: {}", linkified);
+    
     // Configure ammonia to allow code-related tags and links
     let sanitized = ammonia::Builder::default()
         .add_tags(&["code", "pre", "tt", "a"])  // Add code formatting tags and links
         .add_tag_attributes("a", &["href"])     // Allow href attribute on links
-        .clean(text)
+        .clean(&linkified)
         .to_string();
+    
+    log::trace!("Sanitized text: {}", sanitized);
     
     // Simple HTML parser for common HN tags
     // This is a basic implementation - for full HTML parsing you'd want html5ever

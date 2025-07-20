@@ -72,7 +72,7 @@ pub async fn get_story(story_id: i64) -> Result<StoryPageData, ServerError> {
 
     let url = format!("{}{}/{}.json", BASE_URL, ITEM_API, story_id);
     let mut story = make_json_get_request::<StoryPageData>(&url).await?;
-    let comment_ids = &story.kids[..story.kids.len().min(3)];
+    let comment_ids = &story.kids[..story.kids.len().min(50)];  // Show up to 50 top-level comments
     let comments = join_all(
         comment_ids
             .iter()

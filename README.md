@@ -34,7 +34,15 @@ Navigate to http://localhost:8080
 
 ### Deploy Anywhere
 Since this is now a pure static app, you can deploy to:
-- **GitHub Pages** - Just push to gh-pages branch
+
+#### GitHub Pages (Automated)
+This repo includes a GitHub Actions workflow that automatically builds and deploys to GitHub Pages:
+1. Fork this repository
+2. Go to **Settings** → **Pages** 
+3. Set **Source** to "GitHub Actions"
+4. Push to main branch - your site will be available at `https://yourusername.github.io/hackernews-sauron`
+
+#### Other Platforms
 - **Netlify** - Drag and drop the root folder
 - **Vercel** - Connect your repo  
 - **Any CDN** - Upload files to your preferred hosting
