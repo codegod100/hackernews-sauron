@@ -13,6 +13,7 @@ mod content;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FetchStatus<T> {
     Idle,
+    Loading,
     Complete(T),
     Error(String),
 }
@@ -37,15 +38,12 @@ pub enum Msg {
 pub struct App {
     /// the content to be displayed in out app
     pub content: FetchStatus<Content>,
-    /// is the page loading
-    is_loading: bool,
 }
 
 impl Default for App {
     fn default() -> Self {
         Self {
             content: FetchStatus::Idle,
-            is_loading: true,
         }
     }
 }
@@ -137,44 +135,42 @@ impl Application for App {
         match msg {
             Msg::FetchStories => {
                 Self::push_state_url("/");
-                self.is_loading = true;
+                self.content = FetchStatus::Loading;
                 self.fetch_stories()
             }
             Msg::FetchStoriesSorted(sorting) => {
                 Self::push_state_url(&sorting.to_url());
-                self.is_loading = true;
+                self.content = FetchStatus::Loading;
                 self.fetch_stories_with_sorting(sorting)
             }
             Msg::OpenStory(story_id) => {
                 Self::push_state_url(&StoryItem::to_url(story_id));
-                self.is_loading = true;
+                self.content = FetchStatus::Loading;
                 self.fetch_story_page(story_id)
             }
             Msg::ShowUserPage(username) => {
                 Self::push_state_url(&UserData::to_url(&username));
-                self.is_loading = true;
+                self.content = FetchStatus::Loading;
                 log::trace!("showing user: {}", username);
                 self.fetch_user_page(username)
             }
             Msg::ShowCommentPermalink(comment_id) => {
                 Self::push_state_url(&Comment::to_url(comment_id));
-                self.is_loading = true;
+                self.content = FetchStatus::Loading;
                 log::trace!("showing comment: {}", comment_id);
                 self.fetch_comment_permalink(comment_id)
             }
             Msg::ReceivedContent(content) => {
                 self.content = FetchStatus::Complete(content);
-                self.is_loading = false;
                 Cmd::from(Window::scroll_to_top(Msg::NoOp))
             }
             Msg::RequestError(server_error) => {
-                self.is_loading = false;
                 log::error!("Error: {}", server_error);
                 self.content = FetchStatus::Error(server_error.to_string());
                 Cmd::none()
             }
             Msg::UrlChanged(url) => {
-                self.is_loading = true;
+                self.content = FetchStatus::Loading;
                 log::trace!("url changed to: {}", url);
                 
                 // Extract hash from URL or use the full URL for backwards compatibility
@@ -185,7 +181,6 @@ impl Application for App {
                 };
                 
                 let cmd = if let Some(sorting) = StorySorting::from_url(&hash) {
-                    self.is_loading = true;
                     self.fetch_stories_with_sorting(sorting)
                 } else if let Some(story_id) = StoryItem::id_from_url(&hash) {
                     self.fetch_story_page(story_id)
@@ -214,6 +209,7 @@ impl App {
     fn view_content(&self) -> Node<Msg> {
         match &self.content {
             FetchStatus::Idle => node! { <p>"Waiting around..."</p> },
+            FetchStatus::Loading => node! { <p>"Loading..."</p> },
             FetchStatus::Error(e) => {
                 node! {
                     <article>
@@ -244,7 +240,7 @@ impl App {
         node! {
             <div id="loader">
             {
-                if self.is_loading{
+                if matches!(self.content, FetchStatus::Loading) {
                     node!{
                         <div>
                             <div class="line"></div>
@@ -266,26 +262,22 @@ impl App {
     pub fn with_stories(stories: Vec<StoryItem>) -> Self {
         Self {
             content: FetchStatus::Complete(Content::from(stories)),
-            is_loading: false,
         }
     }
     pub fn with_story(story_page: StoryPageData) -> Self {
         Self {
             content: FetchStatus::Complete(Content::from(story_page)),
-            is_loading: false,
         }
     }
     pub fn with_user_page(user_data: UserData) -> Self {
         Self {
             content: FetchStatus::Complete(Content::from(user_data)),
-            is_loading: false,
         }
     }
 
     pub fn with_comment_permalink(comment: Comment) -> Self {
         Self {
             content: FetchStatus::Complete(Content::from(comment)),
-            is_loading: false,
         }
     }
 }
