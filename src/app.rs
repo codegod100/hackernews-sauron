@@ -58,7 +58,7 @@ impl Application for App {
         let location = sauron::window().location();
         let hash = location.hash().unwrap_or_default();
         let pathname = location.pathname().unwrap_or_default();
-        let url = if hash.is_empty() { pathname } else { hash };
+        let url = if hash.is_empty() { pathname } else { hash.clone() };
         
         Cmd::batch([
             // Use popstate for now, we'll handle hash changes through URL monitoring
@@ -70,10 +70,11 @@ impl Application for App {
                 let url = if hash.is_empty() { pathname } else { hash };
                 Msg::UrlChanged(url)
             }),
-            // Handle initial routing
-            if !url.is_empty() && url != "/" {
+            // Handle initial routing - for SPAs with hash routing, empty hash means root
+            if !hash.is_empty() {
                 Cmd::new(async move { Msg::UrlChanged(url) })
             } else {
+                // No hash means we're at the app root, fetch stories
                 match self.content{
                     FetchStatus::Idle => {
                         self.fetch_stories()
@@ -173,11 +174,12 @@ impl Application for App {
                 self.content = FetchStatus::Loading;
                 log::trace!("url changed to: {}", url);
                 
-                // Extract hash from URL or use the full URL for backwards compatibility
+                // Extract hash from URL - for hash routing, we only care about the hash part
                 let hash = if let Some(hash_part) = url.split('#').nth(1) {
                     format!("#{}", hash_part)
                 } else {
-                    url.clone()
+                    // If no hash, treat as root
+                    String::new()
                 };
                 
                 let cmd = if let Some(sorting) = StorySorting::from_url(&hash) {
@@ -188,10 +190,11 @@ impl Application for App {
                     self.fetch_comment_permalink(comment_id)
                 } else if let Some(username) = UserData::id_from_url(&hash) {
                     self.fetch_user_page(username)
-                } else if "/" == url.trim() || url.trim().is_empty() || hash == "#" {
+                } else if hash.is_empty() || hash == "#" {
+                    // Empty hash or just "#" means root - fetch stories
                     self.fetch_stories()
                 } else {
-                    log::trace!("No appropriate route found for url: {} (hash: {})", url, hash);
+                    log::trace!("No appropriate route found for hash: {}", hash);
                     Cmd::none()
                 };
 
